@@ -13,7 +13,7 @@ in
     ]);
 
   rebuild = args: target:
-    remoteCommand target "nixos-rebuild -I ${lib.escapeShellArg target.path} ${
+    remoteCommand target "sudo nixos-rebuild -I ${lib.escapeShellArg target.path} ${
       lib.concatMapStringsSep " " lib.escapeShellArg args
     }";
 
