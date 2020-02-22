@@ -1,7 +1,7 @@
 with import ../../lib;
 with shell;
 
-{ coreutils, dash, findutils, git, jq, openssh, pass, rsync, writeDash }:
+{ coreutils, dash, findutils, git, jq, openssh, pass, rsync, writers }:
 
 let
   check = { force, target }: let
@@ -45,7 +45,7 @@ let
   '';
 
   pop.file = target: source: let
-    configAttrs = ["useChecksum" "exclude"];
+    configAttrs = ["useChecksum" "exclude" "filters" "deleteExcluded"];
     config = filterAttrs (name: _: elem name configAttrs) source;
   in
     rsync' target config (quote source.path);
@@ -145,7 +145,7 @@ let
   populate = target: name: source: let
     source' = source.${source.type};
     target' = target // { path = "${target.path}/${name}"; };
-  in writeDash "populate.${target'.host}.${name}" ''
+  in writers.writeDash "populate.${target'.host}.${name}" ''
     set -efu
     ${pop.${source.type} target' source'}
   '';
@@ -161,9 +161,12 @@ let
         ${concatMapStringsSep " "
           (pattern: /* sh */ "--exclude ${quote pattern}")
           (config.exclude or [])} \
+        ${concatMapStringsSep " "
+          (filter: /* sh */ "--${filter.type} ${quote filter.pattern}")
+          (config.filters or [])} \
         -e ${quote (ssh' target)} \
         -vFrlptD \
-        --delete-excluded \
+        ${optionalString (config.deleteExcluded or true) /* sh */ "--delete-excluded"} \
         "$source_path" \
         ${quote (
           optionalString (!isLocalTarget target) (
@@ -196,7 +199,7 @@ let
 in
 
 { backup ? false, force ? false, source, target }:
-writeDash "populate.${target.host}" ''
+writers.writeDash "populate.${target.host}" ''
   set -efu
   ${check { inherit force target; }}
   set -x
